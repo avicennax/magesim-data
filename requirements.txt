@@ -1,4 +1,6 @@
-jupyter
 aiohttp
-pandas
 gql[all]
+pandas
+
+click
+jupyter
