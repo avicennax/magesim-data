@@ -3,14 +3,11 @@ import asyncio
 import click
 import json
 import os
-import sys
 from pathlib import Path
 
 from wcl.auth import get_oauth_token
 from wcl.query import WCLClient
 from wcl.magesim.query import extract
-
-LOG_DIR = Path(Path(__file__).parent.parent, "logs")
 
 MASTER_QUERY = """
     query ($zoneID: Int!, $encounterID: Int!, $startTime: Float!, $limit: Int!, $page: Int!) {
@@ -35,16 +32,16 @@ ENCOUNTERS.remove(660)
 
 
 @click.command()
-@click.option('--max-pages', default=sys.maxsize, help='Max number of pages to pull.')
+@click.option('--run', required=True, help="Run name - should be unique.")
+@click.option('--max-pages', type=int, default=25, help='Max number of pages to pull.')
 @click.option('--start-page', default=1)
-@click.option('--run', help="Run name - should be unique.")
 @click.option(
     '--encounter-id',
     type=click.IntRange(652, 663), # Don't be an ass and pass 660.
     default=-1,
     help="Encounter ID - all Kara fights pulled if unspecified"
 )
-def pull_extract(max_pages, start_page, encounter_id):
+def pull(run, max_pages, start_page, encounter_id):
     """Query WCL GQL API, extract relevant water elemental events."""
     c = WCLClient(get_oauth_token())
 
@@ -61,12 +58,12 @@ def pull_extract(max_pages, start_page, encounter_id):
     data_dir = Path(Path(__file__).parent.parent, "data")
 
     for enc_id in encounters:
-        extract_subdir = Path(data_dir, "extracts", "v1", str(enc_id))
-        print(f"Writing data to: {extract_subdir.as_posix()}")
-        os.makedirs(extract_subdir.as_posix(), exist_ok=True)
+        pull_subdir = Path(data_dir, "raw_reports", run, str(enc_id))
+        print(f"Writing data to: {pull_subdir.as_posix()}")
+        os.makedirs(pull_subdir.as_posix(), exist_ok=True)
 
         more_pages = True
-        while more_pages or page > max_pages:
+        while more_pages and page <= max_pages:
             qparams = {
                 "zoneID": 1007, # kara
                 "encounterID": enc_id,
@@ -75,20 +72,18 @@ def pull_extract(max_pages, start_page, encounter_id):
                 "page": page,
             }
             res = asyncio.run(c.query(MASTER_QUERY, qparams))
-            print("Results fetched!")
+            print(f"Page {page} fetched!")
 
             data = res["reportData"]["reports"]["data"]
             more_pages = res["reportData"]["reports"]["has_more_pages"]
-            reports, dlq = extract(data)
-            print(f"DLQ: {dlq}")
 
-            for num, report in reports.items():
-                if report:
-                    fp = os.path.join(extract_subdir.as_posix(), f"report_{page}-{num}.json")
-                    with open(fp, "w") as fobj:
-                        json.dump(report, fobj)
+            for report in data:
+                code = report["code"] 
+                fp = os.path.join(pull_subdir.as_posix(), f"report_{code}.json")
+                with open(fp, "w") as fobj:
+                    json.dump(report, fobj)
                     
             page += 1
 
 if __name__ == "__main__":
-    pull_extract()
+    pull()
