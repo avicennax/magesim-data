@@ -1,6 +1,9 @@
 aiohttp
 gql[all]
+matplotlib
 pandas
+scipy
 
+seaborn
 click
 jupyter

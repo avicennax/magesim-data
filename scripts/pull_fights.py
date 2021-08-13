@@ -78,11 +78,11 @@ def pull(run, max_pages, start_page, encounter_id):
             more_pages = res["reportData"]["reports"]["has_more_pages"]
 
             for report in data:
-                code = report["code"] 
+                code = report["code"]
                 fp = os.path.join(pull_subdir.as_posix(), f"report_{code}.json")
                 with open(fp, "w") as fobj:
                     json.dump(report, fobj)
-                    
+
             page += 1
 
 if __name__ == "__main__":
